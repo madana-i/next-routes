@@ -12,8 +12,37 @@ class Routes {
     Router = NextRouter
   } = {}) {
     this.routes = []
+    this.disableDefaultRoutes = false
+    this.namespace = {
+      value: undefined,
+      options: {},
+    }
     this.Link = this.getLink(Link)
     this.Router = this.getRouter(Router)
+  }
+
+  disableDefault () {
+    this.disableDefaultRoutes = true
+
+    return this;
+  }
+
+  withNamespace (namespace, options = {}) {
+    if (this.namespace.value) {
+      throw new Error(`Namespace already registered as "${this.namespace}"`)
+    }
+
+    this.namespace = {
+      value: namespace,
+      options: {
+        name: true,
+        pattern: true,
+        page: true,
+        ...options
+      }
+    }
+
+    return this;
   }
 
   add (name, pattern, page) {
@@ -28,6 +57,16 @@ class Routes {
         name = null
       }
       options = { name, pattern, page }
+    }
+
+    const namespace = this.namespace.value
+    if (namespace) {
+      const namespaceOptions = this.namespace.options
+      Object.keys(options).forEach(k => {
+        if (options[k] && namespaceOptions[k]) {
+          options[k] = `${namespace}/${options[k]}`
+        }
+      })
     }
 
     if (this.findByName(name)) {
@@ -82,7 +121,11 @@ class Routes {
           app.render(req, res, route.page, query)
         }
       } else {
-        nextHandler(req, res, parsedUrl)
+        if (this.disableDefaultRoutes) {
+          app.render404(req, res)
+        } else {
+          nextHandler(req, res, parsedUrl)
+        }
       }
     }
   }
